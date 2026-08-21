@@ -6,7 +6,7 @@
 
 ---
 
-## 👥 Integrantes
+## 👥 Integrante
 - **Estudante 1:** [Wesley Luiz dos Santos Silva] 
 
 
@@ -72,15 +72,8 @@ O projeto foi conduzido utilizando metodologia ágil baseada no **Kanban**, com 
 - **Entrega 1 (07/ago/2026):** Proposta, escopo, público-alvo, protótipos e planejamento inicial.
 - **Entrega 2 (14/ago/2026):** Requisitos funcionais/não funcionais, casos de uso e metodologia.
 - **Entrega 3 (21/ago/2026):** Projeto React Native estruturado, rotas, navegação configurada e telas base.
-- **Entrega 4 (28/ago/2026):** Parser .SRT funcional, player sincronizado, toque em palavras e persistência local.
-- **Entrega 5 (04/set/2026):** Versão final com DeepL API, TTS, Flashcards, Transcrição e documentação completa.
-
-Toda a documentação detalhada das entregas encontra-se na pasta `../docs/`:
-- `../docs/01_proposta_e_requisitos.md`
-- `../docs/02_planejamento_e_metodologia.md`
-- `../docs/03_arquitetura_e_armazenamento.md`
-
----
+- **Entrega 4 (21/ago/2026):** Parser .SRT funcional, player sincronizado, toque em palavras e persistência local.
+- **Entrega 5 (21/ago/2026):** Versão final com DeepL API, TTS, Flashcards, Transcrição e documentação completa.
 
 ## ⚙️ Instruções de Instalação e Execução
 
