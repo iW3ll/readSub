@@ -106,5 +106,13 @@ O projeto foi conduzido utilizando metodologia ágil baseada no **Kanban**, com 
 
 - **Sincronização com Áudio/Vídeo Real:** Suporte futuro para carregar arquivos de áudio `.mp3` ou vídeos `.mp4` associados à legenda.
 - **Dicionário Offline Completo:** Expansão do banco de dados SQLite local com mais de 50.000 termos com transcrição fonética embutida.
+
+- <img width="917" height="392" alt="Screenshot_5" src="https://github.com/user-attachments/assets/aa4ae958-c1ba-44c4-9a38-32e8776dfdf1" />
+<img width="899" height="414" alt="Screenshot_4" src="https://github.com/user-attachments/assets/db91b5e0-b64b-42ac-a286-98914abbcfb7" />
+<img width="682" height="421" alt="Screenshot_3" src="https://github.com/user-attachments/assets/849942e9-ab47-46fe-afc9-2830467e682f" />
+<img width="911" height="403" alt="Screenshot_2" src="https://github.com/user-attachments/assets/38ce4e64-89dd-425d-911f-e8723054a415" />
+<img width="912" height="418" alt="Screenshot_1" src="https://github.com/user-attachments/assets/1bf42fad-5af1-42ff-8922-81076b90c82c" />
+<img width="901" height="284" alt="Screenshot_6" src="https://github.com/user-attachments/assets/84b0299c-3187-4b58-be50-adab2e729196" />
+
 - **Sistema de Repetição Espaçada Avançado (SRS):** Algoritmo SuperMemo (SM-2) para agendamento inteligente das revisões diárias.
 - **Exportação Anki:** Exportação de baralhos de vocabulário no formato `.apkg` para integração com o software Anki.
