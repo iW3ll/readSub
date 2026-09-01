@@ -165,13 +165,64 @@ When you engage directly with authentic dialogues, retention rates increase dram
 00:00:39,200 --> 00:00:44,000
 The future of education belongs to interactive, accessible, and personalized tools.`;
 
+const LITTLE_PRINCE_BOOK = [
+  { chapter: 'Chapter 1: The Drawing', text: 'Once when I was six years old I saw a magnificent picture in a book called True Stories from Nature.' },
+  { chapter: 'Chapter 1: The Drawing', text: 'It was a picture of a boa constrictor in the act of swallowing an animal.' },
+  { chapter: 'Chapter 1: The Drawing', text: 'In the book it said: "Boa constrictors swallow their prey whole, without chewing it."' },
+  { chapter: 'Chapter 1: The Drawing', text: 'After that they are not able to move, and they sleep through the six months that they need for digestion.' },
+  { chapter: 'Chapter 1: The Drawing', text: 'I pondered deeply, then, over the adventures of the jungle. And after some work with a colored pencil I succeeded in making my first drawing.' },
+  { chapter: 'Chapter 1: The Drawing', text: 'My Drawing Number One showed a boa constrictor digesting an elephant.' },
+  { chapter: 'Chapter 2: In the Desert', text: 'So I lived my life alone, without anyone that I could really talk to, until I had an accident with my plane in the Desert of Sahara.' },
+  { chapter: 'Chapter 2: In the Desert', text: 'Something was broken in my engine. And as I had with me neither a mechanic nor any passengers, I set myself to attempt the difficult repairs alone.' },
+  { chapter: 'Chapter 2: In the Desert', text: 'It was a question of life or death for me: I had scarcely enough drinking water to last a week.' },
+  { chapter: 'Chapter 2: In the Desert', text: 'The first night, then, I went to sleep on the sand, a thousand miles from any human habitation.' },
+  { chapter: 'Chapter 2: In the Desert', text: 'Judge, then, of my surprise when at sunrise I was awakened by an odd little voice. It said: "If you please, draw me a sheep!"' },
+  { chapter: 'Chapter 3: The Secret', text: '"And now here is my secret, a very simple secret: It is only with the heart that one can see rightly; what is essential is invisible to the eye."' },
+  { chapter: 'Chapter 3: The Secret', text: '"What is essential is invisible to the eye," the little prince repeated, so that he would be sure to remember.' },
+  { chapter: 'Chapter 3: The Secret', text: '"It is the time you have wasted for your rose that makes your rose so important."' },
+];
+
+const SHERLOCK_HOLMES_BOOK = [
+  { chapter: 'Chapter 1: The Woman', text: 'To Sherlock Holmes she is always THE woman. I have seldom heard him mention her under any other name.' },
+  { chapter: 'Chapter 1: The Woman', text: 'In his eyes she eclipses and predominates the whole of her sex.' },
+  { chapter: 'Chapter 1: The Woman', text: 'It was not that he felt any emotion akin to love for Irene Adler.' },
+  { chapter: 'Chapter 1: The Woman', text: 'All emotions, and that one particularly, were abhorrent to his cold, precise but admirably balanced mind.' },
+  { chapter: 'Chapter 1: The Woman', text: 'He was, I take it, the most perfect reasoning and observing machine that the world has seen.' },
+  { chapter: 'Chapter 2: The Mystery', text: 'I had called upon my friend, Mr. Sherlock Holmes, one day in the autumn of last year.' },
+  { chapter: 'Chapter 2: The Mystery', text: 'He was in deep conversation with a very stout, florid-faced, elderly gentleman with fiery red hair.' },
+  { chapter: 'Chapter 2: The Mystery', text: '"You could not have come at a better time, my dear Watson," Holmes said cordially.' },
+  { chapter: 'Chapter 2: The Mystery', text: '"I was afraid that you were engaged."' },
+  { chapter: 'Chapter 2: The Mystery', text: '"So I am. Very much so. But I know that you share my love of all that is bizarre and outside the conventions of everyday life."' },
+];
+
 export function getSampleSubtitles(): SubtitleFile[] {
   const samples = [
+    {
+      id: 'sample_book_little_prince',
+      title: 'O Pequeno Príncipe (The Little Prince)',
+      description: 'Livro digital clássico em inglês sobre imaginação, amizade e valores humanos.',
+      category: 'epub' as const,
+      contentType: 'epub' as const,
+      author: 'Antoine de Saint-Exupéry',
+      totalChapters: 3,
+      bookItems: LITTLE_PRINCE_BOOK,
+    },
+    {
+      id: 'sample_book_sherlock',
+      title: 'Sherlock Holmes — A Scandal in Bohemia',
+      description: 'Livro digital de mistério com vocabulário refinado de dedução e investigação.',
+      category: 'pdf' as const,
+      contentType: 'pdf' as const,
+      author: 'Arthur Conan Doyle',
+      totalPages: 12,
+      bookItems: SHERLOCK_HOLMES_BOOK,
+    },
     {
       id: 'sample_steve_jobs',
       title: 'Steve Jobs — Discurso em Stanford (Connecting the Dots)',
       description: 'Discurso inspirador sobre seguir a intuição, destino e resiliência.',
       category: 'speeches' as const,
+      contentType: 'subtitle' as const,
       rawSrt: STEVE_JOBS_SRT,
     },
     {
@@ -179,6 +230,7 @@ export function getSampleSubtitles(): SubtitleFile[] {
       title: 'Interestelar — Diálogo sobre Espaço, Tempo e Amor',
       description: 'Cena emblemática de ficção científica com vocabulário de física e emoção.',
       category: 'movies' as const,
+      contentType: 'subtitle' as const,
       rawSrt: INTERSTELLAR_SRT,
     },
     {
@@ -186,6 +238,7 @@ export function getSampleSubtitles(): SubtitleFile[] {
       title: 'Conversação Cotidiana — Encontro em uma Cafeteria',
       description: 'Diálogo prático do dia a dia com expressões idiomáticas e phrasal verbs.',
       category: 'dialogues' as const,
+      contentType: 'subtitle' as const,
       rawSrt: COFFEE_SHOP_CONVERSATION_SRT,
     },
     {
@@ -193,18 +246,49 @@ export function getSampleSubtitles(): SubtitleFile[] {
       title: 'Palestra de Tecnologia — A Revolução da IA e Educação',
       description: 'Apresentação com termos modernos de computação, IA e aprendizado contextual.',
       category: 'speeches' as const,
+      contentType: 'subtitle' as const,
       rawSrt: AI_FUTURE_TALK_SRT,
     },
   ];
 
   return samples.map((item) => {
-    const cues = parseSRT(item.rawSrt);
+    if ('bookItems' in item && item.bookItems) {
+      const virtualSentenceDurationMs = 4000;
+      const cues = item.bookItems.map((bItem, idx) => ({
+        id: idx + 1,
+        startTimeMs: idx * virtualSentenceDurationMs,
+        endTimeMs: (idx + 1) * virtualSentenceDurationMs,
+        startTimeStr: item.contentType === 'pdf' ? `Pág. ${Math.floor(idx / 5) + 1}` : bItem.chapter.split(':')[0],
+        endTimeStr: `Frase ${idx + 1}`,
+        text: bItem.text,
+        rawText: bItem.text,
+        chapterTitle: bItem.chapter,
+        pageNumber: item.contentType === 'pdf' ? Math.floor(idx / 5) + 1 : undefined,
+      }));
+
+      return {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        category: item.category,
+        contentType: item.contentType,
+        author: item.author,
+        totalPages: item.totalPages,
+        totalChapters: item.totalChapters,
+        cues,
+        durationMs: cues[cues.length - 1].endTimeMs,
+        createdAt: Date.now(),
+      };
+    }
+
+    const cues = parseSRT(item.rawSrt || '');
     const durationMs = cues.length > 0 ? cues[cues.length - 1].endTimeMs : 0;
     return {
       id: item.id,
       title: item.title,
       description: item.description,
       category: item.category,
+      contentType: item.contentType,
       cues,
       durationMs,
       createdAt: Date.now(),

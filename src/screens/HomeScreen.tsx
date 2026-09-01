@@ -9,15 +9,15 @@ import {
   TextInput,
   Modal,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
 import { SubtitleFile, StudyStats } from '../types';
-import { parseSRT } from '../services/srtParser';
 import { getSampleSubtitles } from '../assets/sampleSubtitles';
 import { getRecentSubtitles, saveRecentSubtitle, getStudyStats } from '../storage/asyncStorage';
+import { parseDigitalDocument } from '../services/documentParser';
 
 interface HomeScreenProps {
   navigation: any;
@@ -31,8 +31,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [samples] = useState<SubtitleFile[]>(getSampleSubtitles());
   const [recents, setRecents] = useState<SubtitleFile[]>([]);
   const [stats, setStats] = useState<StudyStats | null>(null);
+  const [libraryFilter, setLibraryFilter] = useState<'all' | 'books' | 'subtitles'>('all');
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Processando arquivo...');
   
-  // Modal para colar texto .SRT
+  // Modal para colar texto / SRT
   const [pasteModalVisible, setPasteModalVisible] = useState(false);
   const [pastedText, setPastedText] = useState('');
   const [pastedTitle, setPastedTitle] = useState('');
@@ -52,12 +55,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setStats(st);
   };
 
-  // Carregar arquivo do celular via DocumentPicker
-  const handlePickDocument = async () => {
+  // Carregar arquivo (PDF, ePub, SRT, TXT)
+  const handlePickDocument = async (filterMode: 'all' | 'books' | 'subtitles' = 'all') => {
     try {
+      let mimeTypes: string[] = ['*/*'];
+      if (filterMode === 'books') {
+        mimeTypes = [
+          'application/pdf',
+          '.pdf',
+          'application/epub+zip',
+          '.epub',
+          'text/plain',
+          '.txt',
+          'application/octet-stream',
+          '*/*',
+        ];
+      } else if (filterMode === 'subtitles') {
+        mimeTypes = ['text/plain', '.srt', '.vtt', '.txt', 'application/x-subrip', '*/*'];
+      }
+
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['*/*', 'text/plain', 'application/x-subrip'],
+        type: mimeTypes,
         copyToCacheDirectory: true,
+        multiple: false,
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) {
@@ -65,88 +85,78 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       }
 
       const fileAsset = result.assets[0];
-      const fileName = fileAsset.name || 'Legenda Personalizada';
+      const fileName = fileAsset.name || 'Documento';
       const fileUri = fileAsset.uri;
+      const fileMime = fileAsset.mimeType || '';
 
-      // Lê o conteúdo do arquivo com suporte a Web e Mobile
-      let fileContent = '';
-      if (Platform.OS === 'web') {
-        const webAsset = fileAsset as any;
-        if (webAsset.file && typeof webAsset.file.text === 'function') {
-          fileContent = await webAsset.file.text();
-        } else if (fileUri) {
-          const res = await fetch(fileUri);
-          fileContent = await res.text();
-        }
-      } else {
-        fileContent = await FileSystem.readAsStringAsync(fileUri, {
-          encoding: FileSystem.EncodingType.UTF8,
-        });
-      }
+      setIsLoadingFile(true);
+      setLoadingMessage(
+        fileName.toLowerCase().endsWith('.pdf') || fileMime.includes('pdf')
+          ? 'Extraindo páginas e texto do PDF...'
+          : fileName.toLowerCase().endsWith('.epub') || fileMime.includes('epub')
+          ? 'Processando capítulos do livro ePub...'
+          : 'Indexando conteúdo...'
+      );
 
-      const parsedCues = parseSRT(fileContent);
+      const parsedDoc = await parseDigitalDocument({
+        name: fileName,
+        uri: fileUri,
+        mimeType: fileMime,
+        file: (fileAsset as any).file,
+      });
 
-      if (parsedCues.length === 0) {
+      if (!parsedDoc || !parsedDoc.cues || parsedDoc.cues.length === 0) {
         Alert.alert(
-          'Arquivo Inválido',
-          'Não foi possível encontrar blocos de legenda válidos no formato .SRT.'
+          'Arquivo Sem Conteúdo',
+          'Não foi possível encontrar frases ou falas válidas no arquivo selecionado.'
         );
+        setIsLoadingFile(false);
         return;
       }
 
-      const newSubtitle: SubtitleFile = {
-        id: `custom_${Date.now()}`,
-        title: fileName.replace(/\.srt$/i, ''),
-        description: `Legenda importada (${parsedCues.length} falas)`,
-        category: 'custom',
-        cues: parsedCues,
-        durationMs: parsedCues[parsedCues.length - 1].endTimeMs,
-        createdAt: Date.now(),
-      };
-
-      await saveRecentSubtitle(newSubtitle);
-      onSelectSubtitle(newSubtitle);
+      await saveRecentSubtitle(parsedDoc);
+      setIsLoadingFile(false);
+      onSelectSubtitle(parsedDoc);
       navigation.navigate('Player');
-    } catch (error) {
-      console.error('Erro ao abrir arquivo:', error);
-      Alert.alert('Erro', 'Ocorreu uma falha ao tentar ler o arquivo selecionado.');
+    } catch (error: any) {
+      setIsLoadingFile(false);
+      console.error('Erro ao abrir documento:', error);
+      Alert.alert(
+        'Erro ao Abrir Arquivo',
+        error?.message || 'Ocorreu uma falha ao tentar ler e processar o arquivo selecionado.'
+      );
     }
   };
 
-  // Processar texto colado manualmente
-  const handleProcessPastedSRT = async () => {
+  // Processar texto ou SRT colado manualmente
+  const handleProcessPastedContent = async () => {
     if (!pastedText.trim()) {
-      Alert.alert('Aviso', 'Por favor, cole o conteúdo de uma legenda .SRT.');
+      Alert.alert('Aviso', 'Por favor, cole o conteúdo de um livro, texto ou legenda .SRT.');
       return;
     }
 
-    const parsedCues = parseSRT(pastedText);
-    if (parsedCues.length === 0) {
-      Alert.alert(
-        'Formato Inválido',
-        'O texto colado não possui o formato de timestamp de legendas .SRT (ex: 00:00:01,000 --> 00:00:04,000).'
-      );
-      return;
+    try {
+      setIsLoadingFile(true);
+      setLoadingMessage('Processando texto colado...');
+
+      const title = pastedTitle.trim() || `Texto Colado (${new Date().toLocaleDateString()})`;
+      const parsedDoc = await parseDigitalDocument({
+        name: title,
+        rawText: pastedText,
+      });
+
+      await saveRecentSubtitle(parsedDoc);
+      setIsLoadingFile(false);
+      setPasteModalVisible(false);
+      setPastedText('');
+      setPastedTitle('');
+
+      onSelectSubtitle(parsedDoc);
+      navigation.navigate('Player');
+    } catch (error: any) {
+      setIsLoadingFile(false);
+      Alert.alert('Erro ao Processar', error?.message || 'Não foi possível analisar o texto informado.');
     }
-
-    const title = pastedTitle.trim() || `Legenda Colada (${new Date().toLocaleDateString()})`;
-    const newSubtitle: SubtitleFile = {
-      id: `pasted_${Date.now()}`,
-      title,
-      description: `Texto colado com ${parsedCues.length} falas`,
-      category: 'custom',
-      cues: parsedCues,
-      durationMs: parsedCues[parsedCues.length - 1].endTimeMs,
-      createdAt: Date.now(),
-    };
-
-    await saveRecentSubtitle(newSubtitle);
-    setPasteModalVisible(false);
-    setPastedText('');
-    setPastedTitle('');
-
-    onSelectSubtitle(newSubtitle);
-    navigation.navigate('Player');
   };
 
   const handleSelectSub = async (sub: SubtitleFile) => {
@@ -155,15 +165,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     navigation.navigate('Player');
   };
 
+  const filteredSamples = samples.filter((s) => {
+    if (libraryFilter === 'books') {
+      return s.contentType === 'pdf' || s.contentType === 'epub' || s.category === 'book' || s.category === 'pdf' || s.category === 'epub';
+    }
+    if (libraryFilter === 'subtitles') {
+      return s.contentType === 'subtitle' || s.category === 'movies' || s.category === 'speeches' || s.category === 'dialogues';
+    }
+    return true;
+  });
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={true}>
         {/* Header de Boas-Vindas */}
         <View style={styles.header}>
           <View>
             <Text style={styles.appName}>ReadSub 🎬</Text>
             <Text style={styles.appSubtitle}>Aprenda inglês no ritmo das legendas</Text>
           </View>
+          <TouchableOpacity
+            style={styles.profileHeaderBtn}
+            onPress={() => navigation.navigate('Perfil')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="person-circle-outline" size={34} color="#3B82F6" />
+          </TouchableOpacity>
         </View>
 
         {/* Resumo de Estudos / Estatísticas */}
@@ -188,21 +215,34 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </View>
 
-        {/* Seção de Upload e Entrada de Legenda */}
-        <Text style={styles.sectionHeading}>CARREGAR LEGENDA</Text>
+        {/* Seção de Upload e Entrada de Conteúdo */}
+        <Text style={styles.sectionHeading}>CARREGAR CONTEÚDO</Text>
         
         <View style={styles.actionGrid}>
+          {/* Botão de Livro Digital (PDF / ePub) */}
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => handlePickDocument('books')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.actionIconCircle, { backgroundColor: '#10B981' }]}>
+              <Ionicons name="book-outline" size={26} color="#FFFFFF" />
+            </View>
+            <Text style={styles.actionCardTitle}>Ler Livro (PDF / ePub)</Text>
+            <Text style={styles.actionCardDesc}>Importar e-books e PDFs</Text>
+          </TouchableOpacity>
+
           {/* Botão de Arquivo .SRT */}
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={handlePickDocument}
+            onPress={() => handlePickDocument('subtitles')}
             activeOpacity={0.8}
           >
             <View style={[styles.actionIconCircle, { backgroundColor: '#2563EB' }]}>
               <Ionicons name="folder-open-outline" size={26} color="#FFFFFF" />
             </View>
-            <Text style={styles.actionCardTitle}>Abrir Arquivo .SRT</Text>
-            <Text style={styles.actionCardDesc}>Carregue do seu celular</Text>
+            <Text style={styles.actionCardTitle}>Legenda .SRT</Text>
+            <Text style={styles.actionCardDesc}>Do dispositivo</Text>
           </TouchableOpacity>
 
           {/* Botão de Colar Texto */}
@@ -214,70 +254,167 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <View style={[styles.actionIconCircle, { backgroundColor: '#7C3AED' }]}>
               <Ionicons name="clipboard-outline" size={26} color="#FFFFFF" />
             </View>
-            <Text style={styles.actionCardTitle}>Colar Texto .SRT</Text>
-            <Text style={styles.actionCardDesc}>Inserir bloco de texto</Text>
+            <Text style={styles.actionCardTitle}>Colar Texto / SRT</Text>
+            <Text style={styles.actionCardDesc}>Texto ou legenda</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Seção de Legendas Prontas / Biblioteca */}
-        <Text style={styles.sectionHeading}>BIBLIOTECA DE MODELOS</Text>
-        {samples.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.subtitleCard}
-            onPress={() => handleSelectSub(item)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.subIconContainer}>
-              <Ionicons
-                name={
-                  item.category === 'movies'
-                    ? 'film'
-                    : item.category === 'speeches'
-                    ? 'mic'
-                    : 'chatbubbles'
-                }
-                size={24}
-                color="#60A5FA"
-              />
-            </View>
-            <View style={styles.subInfoContainer}>
-              <Text style={styles.subTitle} numberOfLines={1}>
-                {item.title}
+        {/* Seção de Biblioteca e Filtros */}
+        <View style={styles.libraryHeaderRow}>
+          <Text style={styles.sectionHeading}>BIBLIOTECA DE MODELOS</Text>
+          <View style={styles.filterPillsRow}>
+            <TouchableOpacity
+              style={[styles.filterPill, libraryFilter === 'all' && styles.filterPillActive]}
+              onPress={() => setLibraryFilter('all')}
+            >
+              <Text style={[styles.filterPillText, libraryFilter === 'all' && styles.filterPillTextActive]}>
+                Todos
               </Text>
-              <Text style={styles.subDesc} numberOfLines={2}>
-                {item.description}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.filterPill, libraryFilter === 'books' && styles.filterPillActive]}
+              onPress={() => setLibraryFilter('books')}
+            >
+              <Text style={[styles.filterPillText, libraryFilter === 'books' && styles.filterPillTextActive]}>
+                📚 Livros
               </Text>
-              <View style={styles.subMetaRow}>
-                <Text style={styles.subMetaText}>
-                  {item.cues.length} falas
-                </Text>
-                <Text style={styles.subMetaDot}>•</Text>
-                <Text style={styles.subMetaText}>
-                  {(item.durationMs / 1000).toFixed(0)}s de duração
-                </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.filterPill, libraryFilter === 'subtitles' && styles.filterPillActive]}
+              onPress={() => setLibraryFilter('subtitles')}
+            >
+              <Text style={[styles.filterPillText, libraryFilter === 'subtitles' && styles.filterPillTextActive]}>
+                🎬 Legendas
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {filteredSamples.map((item) => {
+          const isBook = item.contentType === 'epub' || item.contentType === 'pdf' || item.category === 'epub' || item.category === 'pdf' || item.category === 'book';
+          return (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.subtitleCard}
+              onPress={() => handleSelectSub(item)}
+              activeOpacity={0.7}
+            >
+              <View style={[
+                styles.subIconContainer,
+                item.contentType === 'epub' || item.category === 'epub'
+                  ? { backgroundColor: 'rgba(16, 185, 129, 0.15)' }
+                  : item.contentType === 'pdf' || item.category === 'pdf'
+                  ? { backgroundColor: 'rgba(239, 68, 68, 0.15)' }
+                  : { backgroundColor: '#0F172A' }
+              ]}>
+                <Ionicons
+                  name={
+                    item.contentType === 'epub' || item.category === 'epub'
+                      ? 'book'
+                      : item.contentType === 'pdf' || item.category === 'pdf'
+                      ? 'document-text'
+                      : item.category === 'movies'
+                      ? 'film'
+                      : item.category === 'speeches'
+                      ? 'mic'
+                      : 'chatbubbles'
+                  }
+                  size={24}
+                  color={
+                    item.contentType === 'epub' || item.category === 'epub'
+                      ? '#34D399'
+                      : item.contentType === 'pdf' || item.category === 'pdf'
+                      ? '#F87171'
+                      : '#60A5FA'
+                  }
+                />
               </View>
-            </View>
-            <Ionicons name="play-circle" size={32} color="#3B82F6" />
-          </TouchableOpacity>
-        ))}
+              <View style={styles.subInfoContainer}>
+                <View style={styles.cardTitleRow}>
+                  <Text style={styles.subTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  {isBook && (
+                    <View style={[
+                      styles.bookTypeBadge,
+                      item.contentType === 'epub' ? styles.epubBadge : styles.pdfBadge
+                    ]}>
+                      <Text style={styles.bookTypeBadgeText}>
+                        {item.contentType === 'epub' ? 'ePUB' : 'PDF'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <Text style={styles.subDesc} numberOfLines={2}>
+                  {item.description}
+                </Text>
+
+                <View style={styles.subMetaRow}>
+                  <Text style={styles.subMetaText}>
+                    {item.cues.length} {isBook ? 'frases' : 'falas'}
+                  </Text>
+                  {item.author && (
+                    <>
+                      <Text style={styles.subMetaDot}>•</Text>
+                      <Text style={styles.subMetaText} numberOfLines={1}>
+                        Autor: {item.author}
+                      </Text>
+                    </>
+                  )}
+                  {item.totalChapters && (
+                    <>
+                      <Text style={styles.subMetaDot}>•</Text>
+                      <Text style={styles.subMetaText}>
+                        {item.totalChapters} capítulos
+                      </Text>
+                    </>
+                  )}
+                  {item.totalPages && (
+                    <>
+                      <Text style={styles.subMetaDot}>•</Text>
+                      <Text style={styles.subMetaText}>
+                        {item.totalPages} págs
+                      </Text>
+                    </>
+                  )}
+                </View>
+              </View>
+              <Ionicons name="play-circle" size={32} color="#3B82F6" />
+            </TouchableOpacity>
+          );
+        })}
 
         {/* Seção Recentes se houver */}
         {recents.length > 0 && (
           <>
             <Text style={styles.sectionHeading}>RECENTES</Text>
-            {recents.slice(0, 3).map((item) => (
+            {recents.slice(0, 4).map((item) => (
               <TouchableOpacity
                 key={`recent_${item.id}`}
                 style={[styles.subtitleCard, styles.recentCard]}
                 onPress={() => handleSelectSub(item)}
               >
-                <Ionicons name="time-outline" size={22} color="#94A3B8" />
+                <Ionicons
+                  name={
+                    item.contentType === 'epub' || item.category === 'epub'
+                      ? 'book'
+                      : item.contentType === 'pdf' || item.category === 'pdf'
+                      ? 'document-text'
+                      : 'time-outline'
+                  }
+                  size={22}
+                  color="#94A3B8"
+                />
                 <View style={[styles.subInfoContainer, { marginLeft: 12 }]}>
                   <Text style={styles.subTitle} numberOfLines={1}>
                     {item.title}
                   </Text>
-                  <Text style={styles.subDesc}>{item.cues.length} falas salvas</Text>
+                  <Text style={styles.subDesc}>
+                    {item.cues.length} {item.contentType === 'epub' || item.contentType === 'pdf' ? 'frases salvas' : 'falas salvas'}
+                  </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#64748B" />
               </TouchableOpacity>
@@ -288,7 +425,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Modal para colar texto .SRT */}
+      {/* Modal de Carregamento ao Processar Arquivo */}
+      <Modal visible={isLoadingFile} transparent animationType="fade">
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text style={styles.loadingModalTitle}>Carregando Documento</Text>
+            <Text style={styles.loadingModalDesc}>{loadingMessage}</Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para colar texto / .SRT */}
       <Modal
         visible={pasteModalVisible}
         animationType="slide"
@@ -298,7 +446,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={styles.pasteModalOverlay}>
           <View style={styles.pasteModalContent}>
             <View style={styles.pasteModalHeader}>
-              <Text style={styles.pasteModalTitle}>Colar Legenda .SRT</Text>
+              <Text style={styles.pasteModalTitle}>Colar Texto ou Legenda</Text>
               <TouchableOpacity onPress={() => setPasteModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#94A3B8" />
               </TouchableOpacity>
@@ -306,7 +454,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             <TextInput
               style={styles.titleInput}
-              placeholder="Título da legenda (ex: Trecho de Filme)"
+              placeholder="Título (ex: O Pequeno Príncipe / Trecho de Filme)"
               placeholderTextColor="#64748B"
               value={pastedTitle}
               onChangeText={setPastedTitle}
@@ -314,7 +462,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             <TextInput
               style={styles.pasteInput}
-              placeholder="Cole aqui o conteúdo SRT completo com tempos (ex: 1\n00:00:01,000 --> 00:00:04,000\nHello world!)"
+              placeholder="Cole aqui o texto em inglês (livro, parágrafos, artigo) ou o formato SRT com tempos..."
               placeholderTextColor="#64748B"
               multiline
               value={pastedText}
@@ -332,10 +480,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
               <TouchableOpacity
                 style={styles.pasteSubmitBtn}
-                onPress={handleProcessPastedSRT}
+                onPress={handleProcessPastedContent}
               >
                 <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                <Text style={styles.pasteSubmitText}>Carregar Legenda</Text>
+                <Text style={styles.pasteSubmitText}>Carregar Conteúdo</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -357,16 +505,22 @@ const styles = StyleSheet.create({
   header: {
     marginTop: 14,
     marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  profileHeaderBtn: {
+    padding: 4,
   },
   appName: {
     color: '#F8FAFC',
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
   appSubtitle: {
     color: '#94A3B8',
-    fontSize: 14,
+    fontSize: 13,
     marginTop: 2,
   },
   statsCard: {
@@ -570,5 +724,92 @@ const styles = StyleSheet.create({
   pasteSubmitText: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  libraryHeaderRow: {
+    flexDirection: 'column',
+    marginBottom: 8,
+  },
+  filterPillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  filterPillActive: {
+    backgroundColor: '#2563EB',
+    borderColor: '#3B82F6',
+  },
+  filterPillText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  bookTypeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  epubBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderWidth: 1,
+    borderColor: '#10B981',
+  },
+  pdfBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  bookTypeBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    letterSpacing: 0.5,
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+    width: '100%',
+    maxWidth: 340,
+    gap: 12,
+  },
+  loadingModalTitle: {
+    color: '#F8FAFC',
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 6,
+  },
+  loadingModalDesc: {
+    color: '#94A3B8',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

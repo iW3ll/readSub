@@ -66,7 +66,7 @@ export const WordTranslationModal: React.FC<WordTranslationModalProps> = ({
               <Text style={styles.loadingText}>Consultando DeepL & Dicionário...</Text>
             </View>
           ) : wordDetails ? (
-            <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={true}>
               {/* Botões de Ação Rápida: Áudio TTS e Salvar Vocabulário */}
               <View style={styles.actionsBar}>
                 <TouchableOpacity

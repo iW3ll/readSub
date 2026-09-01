@@ -214,7 +214,7 @@ export const VocabularyScreen: React.FC<VocabularyScreenProps> = ({ navigation }
             keyExtractor={(item) => item.id}
             renderItem={renderWordItem}
             contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
           />
         ) : (
           <View style={styles.emptyContainer}>

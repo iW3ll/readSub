@@ -188,7 +188,10 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ navigation }
             </View>
           ) : (
             // Modo Sessão Interativa (1 Card por vez)
-            <View style={styles.sessionArea}>
+            <ScrollView
+              contentContainerStyle={styles.sessionArea}
+              showsVerticalScrollIndicator={true}
+            >
               {/* Barra de Progresso */}
               <View style={styles.progressContainer}>
                 <View style={styles.progressHeader}>
@@ -285,13 +288,13 @@ export const FlashcardsScreen: React.FC<FlashcardsScreenProps> = ({ navigation }
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           )
         ) : (
           // Modo Lista de Todos os Cards
           <ScrollView
             style={styles.listContainer}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
           >
             {words.map((item) => (
               <FlashcardItem
@@ -363,7 +366,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   sessionArea: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'space-between',
     paddingBottom: 16,
   },

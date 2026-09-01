@@ -288,7 +288,9 @@ export const PlayerScreen: React.FC<PlayerScreenProps> = ({
               {currentSubtitle.title}
             </Text>
             <Text style={styles.subSubtitle}>
-              {cues.length} falas • {Math.floor(durationMs / 1000)}s
+              {currentSubtitle.contentType === 'epub' || currentSubtitle.contentType === 'pdf' || currentSubtitle.category === 'epub' || currentSubtitle.category === 'pdf' || currentSubtitle.category === 'book'
+                ? `${currentSubtitle.contentType === 'epub' ? '📚 ePub' : currentSubtitle.contentType === 'pdf' ? '📄 PDF' : '📖 Livro'} • ${currentSubtitle.author ? currentSubtitle.author + ' • ' : ''}Frase ${activeCue ? activeCue.id : 1} de ${cues.length}`
+                : `${cues.length} falas • ${Math.floor(durationMs / 1000)}s`}
             </Text>
           </View>
 
@@ -303,7 +305,7 @@ export const PlayerScreen: React.FC<PlayerScreenProps> = ({
         {/* Área Principal de Exibição das Legendas Interativas */}
         <ScrollView
           contentContainerStyle={styles.centerDisplay}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
         >
           <SubtitleViewer
             currentCue={activeCue}

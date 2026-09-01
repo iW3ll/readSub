@@ -1,5 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SavedWord, SubtitleFile, UserSettings, StudyStats } from '../types';
+import {
+  fetchCloudFlashcards,
+  saveCloudFlashcard,
+  deleteCloudFlashcard,
+  toggleCloudFlashcardMastered,
+  recordStudySession,
+} from '../services/supabaseFlashcards';
+import { getCurrentUser } from '../services/authService';
 
 const STORAGE_KEYS = {
   VOCABULARY: '@readsub_vocabulary',
@@ -26,10 +34,20 @@ const DEFAULT_STATS: StudyStats = {
   totalStudySeconds: 0,
 };
 
-// ==================== VOCABULÁRIO ====================
+// ==================== VOCABULÁRIO (LOCAL + NUVEM) ====================
 
 export async function getSavedWords(): Promise<SavedWord[]> {
   try {
+    const user = await getCurrentUser();
+    if (user) {
+      const cloudWords = await fetchCloudFlashcards();
+      if (cloudWords && cloudWords.length > 0) {
+        // Atualiza cache local
+        await AsyncStorage.setItem(STORAGE_KEYS.VOCABULARY, JSON.stringify(cloudWords));
+        return cloudWords;
+      }
+    }
+
     const json = await AsyncStorage.getItem(STORAGE_KEYS.VOCABULARY);
     if (!json) return [];
     const words: SavedWord[] = JSON.parse(json);
@@ -47,35 +65,43 @@ export async function saveWord(
     const words = await getSavedWords();
     const clean = wordData.cleanWord.toLowerCase().trim();
 
-    // Verifica se já existe a palavra para não duplicar
+    // Verifica se já existe a palavra localmente
     const existingIndex = words.findIndex((w) => w.cleanWord.toLowerCase().trim() === clean);
 
+    let finalWord: SavedWord;
+
     if (existingIndex >= 0) {
-      // Atualiza com novos dados se necessário
       words[existingIndex] = {
         ...words[existingIndex],
         ...wordData,
         dateAdded: Date.now(),
       };
-      await AsyncStorage.setItem(STORAGE_KEYS.VOCABULARY, JSON.stringify(words));
-      return words[existingIndex];
+      finalWord = words[existingIndex];
+    } else {
+      finalWord = {
+        ...wordData,
+        id: `word_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        dateAdded: Date.now(),
+        mastered: false,
+        reviewCount: 0,
+      };
+      words.unshift(finalWord);
     }
 
-    const newWord: SavedWord = {
-      ...wordData,
-      id: `word_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      dateAdded: Date.now(),
-      mastered: false,
-      reviewCount: 0,
-    };
+    // Salva no AsyncStorage
+    await AsyncStorage.setItem(STORAGE_KEYS.VOCABULARY, JSON.stringify(words));
 
-    const updated = [newWord, ...words];
-    await AsyncStorage.setItem(STORAGE_KEYS.VOCABULARY, JSON.stringify(updated));
-    
+    // Salva na nuvem se logado
+    const user = await getCurrentUser();
+    if (user) {
+      const cloudRes = await saveCloudFlashcard(finalWord);
+      if (cloudRes) finalWord = cloudRes;
+    }
+
     // Atualiza contagem nos stats
     await incrementStat('totalWordsSaved');
 
-    return newWord;
+    return finalWord;
   } catch (error) {
     console.error('Erro ao salvar palavra:', error);
     throw error;
@@ -87,6 +113,12 @@ export async function deleteWord(id: string): Promise<void> {
     const words = await getSavedWords();
     const updated = words.filter((w) => w.id !== id);
     await AsyncStorage.setItem(STORAGE_KEYS.VOCABULARY, JSON.stringify(updated));
+
+    // Deleta na nuvem se logado
+    const user = await getCurrentUser();
+    if (user) {
+      await deleteCloudFlashcard(id);
+    }
   } catch (error) {
     console.error('Erro ao deletar palavra:', error);
   }
@@ -103,6 +135,15 @@ export async function toggleWordMastered(id: string): Promise<SavedWord | null> 
     words[index].reviewCount = (words[index].reviewCount || 0) + 1;
 
     await AsyncStorage.setItem(STORAGE_KEYS.VOCABULARY, JSON.stringify(words));
+
+    // Atualiza na nuvem se logado
+    const user = await getCurrentUser();
+    if (user) {
+      await toggleCloudFlashcardMastered(id);
+      // Registra sessão rápida de estudo
+      await recordStudySession(1, words[index].mastered ? 1 : 0, 10);
+    }
+
     return words[index];
   } catch (error) {
     console.error('Erro ao alterar status de aprendizado:', error);
@@ -157,7 +198,7 @@ export async function saveRecentSubtitle(sub: SubtitleFile): Promise<void> {
   try {
     const recents = await getRecentSubtitles();
     const filtered = recents.filter((item) => item.id !== sub.id);
-    const updated = [sub, ...filtered].slice(0, 10); // Mantém os 10 mais recentes
+    const updated = [sub, ...filtered].slice(0, 10);
     await AsyncStorage.setItem(STORAGE_KEYS.RECENT_SUBTITLES, JSON.stringify(updated));
   } catch (error) {
     console.error('Erro ao salvar recente:', error);

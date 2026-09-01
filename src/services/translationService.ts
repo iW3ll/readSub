@@ -131,10 +131,67 @@ const OFFLINE_DICTIONARY: Record<string, string> = {
   challenge: 'desafio, desafiar',
   success: 'sucesso',
   failure: 'fracasso, falha',
+  today: 'hoje',
+  tomorrow: 'amanhã',
+  yesterday: 'ontem',
+  always: 'sempre',
+  never: 'nunca',
+  sometimes: 'às vezes',
+  start: 'começar, início',
+  stop: 'parar',
+  help: 'ajuda, ajudar',
+  need: 'precisar, necessidade',
+  feel: 'sentir',
+  try: 'tentar',
+  leave: 'deixar, sair',
+  call: 'chamar, ligar',
+  keep: 'manter, guardar',
+  let: 'deixar, permitir',
+  begin: 'começar',
+  seem: 'parecer',
+  talk: 'conversar, falar',
+  turn: 'virar, vez, transformar',
+  startled: 'assustado',
+  happy: 'feliz',
+  sad: 'triste',
+  world: 'mundo',
+  place: 'lugar',
+  thing: 'coisa',
+  man: 'homem',
+  woman: 'mulher',
+  child: 'criança',
+  eye: 'olho',
+  hand: 'mão',
+  mind: 'mente',
+  head: 'cabeça',
+  home: 'casa, lar',
+  water: 'água',
+  night: 'noite',
+  school: 'escola',
+  point: 'ponto',
+  right: 'certo, direito',
+  left: 'esquerda, deixou',
+  small: 'pequeno',
+  big: 'grande',
+  high: 'alto',
+  different: 'diferente',
+  next: 'próximo',
+  early: 'cedo',
+  young: 'jovem',
+  important: 'importante',
+  few: 'poucos',
+  public: 'público',
+  bad: 'ruim, mau',
+  same: 'mesmo',
+  able: 'capaz',
+  again: 'de novo, novamente',
+  far: 'longe',
+  off: 'desligado, longe',
+  always_learning: 'sempre aprendendo',
 };
 
 /**
- * Traduz um texto (palavra ou frase completa) usando DeepL API ou serviços de fallback.
+ * Traduz um texto (palavra ou frase completa) usando DeepL API, Dicionário Instantâneo ou MyMemory.
  */
 export async function translateText(
   text: string,
@@ -155,7 +212,21 @@ export async function translateText(
     return translationCache.get(cacheKey)!;
   }
 
-  // 1. Tentativa via DeepL API (se houver chave configurada)
+  // 1. Otimização Instantânea (0ms): Se for uma palavra única comum, usa o dicionário local
+  const cleanWordKey = trimmed.toLowerCase().replace(/[^a-z]/g, '');
+  const isSingleWord = !trimmed.includes(' ');
+
+  if (isSingleWord && OFFLINE_DICTIONARY[cleanWordKey] && !customApiKey) {
+    const result: TranslationResult = {
+      originalText: trimmed,
+      translatedText: OFFLINE_DICTIONARY[cleanWordKey],
+      source: 'fallback',
+    };
+    translationCache.set(cacheKey, result);
+    return result;
+  }
+
+  // 2. Tentativa via DeepL API (se houver chave configurada)
   if (customApiKey && customApiKey.trim().length > 5) {
     try {
       const apiKey = customApiKey.trim();
@@ -164,8 +235,10 @@ export async function translateText(
         ? 'https://api-free.deepl.com/v2/translate'
         : 'https://api.deepl.com/v2/translate';
 
-      // DeepL aceita PT-BR ou PT
       const deeplTarget = targetLang.toUpperCase() === 'PT' ? 'PT-BR' : targetLang.toUpperCase();
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -177,7 +250,9 @@ export async function translateText(
           text: [trimmed],
           target_lang: deeplTarget,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -193,17 +268,22 @@ export async function translateText(
         }
       }
     } catch (e) {
-      console.warn('Erro ao consultar DeepL API, alternando para fallback:', e);
+      console.warn('Erro ao consultar DeepL API, alternando para fallback rápido:', e);
     }
   }
 
-  // 2. Tentativa via MyMemory API (Gratuita, pública e de alta qualidade)
+  // 3. Tentativa via MyMemory API com timeout curto (1.5s)
   try {
     const encoded = encodeURIComponent(trimmed);
     const langPair = targetLang.toLowerCase() === 'pt' ? 'en|pt-br' : `en|${targetLang.toLowerCase()}`;
     const url = `https://api.mymemory.translated.net/get?q=${encoded}&langpair=${langPair}`;
 
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1800);
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     if (response.ok) {
       const data = await response.json();
       if (data && data.responseData && data.responseData.translatedText) {
@@ -217,11 +297,10 @@ export async function translateText(
       }
     }
   } catch (e) {
-    console.warn('Erro no fallback MyMemory:', e);
+    // Silencioso se timeout
   }
 
-  // 3. Fallback para dicionário offline de termos comuns
-  const cleanWordKey = trimmed.toLowerCase().replace(/[^a-z]/g, '');
+  // 4. Fallback para dicionário offline
   if (OFFLINE_DICTIONARY[cleanWordKey]) {
     const result: TranslationResult = {
       originalText: trimmed,
@@ -232,7 +311,7 @@ export async function translateText(
     return result;
   }
 
-  // Fallback padrão se tudo falhar
+  // 5. Fallback padrão
   return {
     originalText: trimmed,
     translatedText: trimmed,

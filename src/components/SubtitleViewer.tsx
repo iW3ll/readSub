@@ -67,10 +67,40 @@ export const SubtitleViewer: React.FC<SubtitleViewerProps> = ({
         {currentCue ? (
           <>
             <View style={styles.cueHeader}>
-              <View style={styles.timeBadge}>
-                <Ionicons name="time-outline" size={13} color="#94A3B8" />
-                <Text style={styles.timeBadgeText}>
-                  {currentCue.startTimeStr.split(',')[0]} - {currentCue.endTimeStr.split(',')[0]}
+              <View style={[
+                styles.timeBadge,
+                currentCue.chapterTitle
+                  ? { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: '#10B981', borderWidth: 1 }
+                  : currentCue.pageNumber
+                  ? { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: '#EF4444', borderWidth: 1 }
+                  : null
+              ]}>
+                <Ionicons
+                  name={
+                    currentCue.chapterTitle
+                      ? 'book-outline'
+                      : currentCue.pageNumber
+                      ? 'document-text-outline'
+                      : 'time-outline'
+                  }
+                  size={13}
+                  color={
+                    currentCue.chapterTitle
+                      ? '#34D399'
+                      : currentCue.pageNumber
+                      ? '#F87171'
+                      : '#94A3B8'
+                  }
+                />
+                <Text style={[
+                  styles.timeBadgeText,
+                  currentCue.chapterTitle
+                    ? { color: '#34D399' }
+                    : currentCue.pageNumber
+                    ? { color: '#F87171' }
+                    : null
+                ]}>
+                  {currentCue.chapterTitle || (currentCue.pageNumber ? `Página ${currentCue.pageNumber}` : `${currentCue.startTimeStr.split(',')[0]} - ${currentCue.endTimeStr.split(',')[0]}`)}
                 </Text>
               </View>
               

@@ -1,18 +1,26 @@
+export type ContentType = 'subtitle' | 'book' | 'pdf' | 'epub';
+
 export interface SubtitleCue {
   id: number;
   startTimeMs: number;
   endTimeMs: number;
-  startTimeStr: string; // HH:MM:SS,mmm
-  endTimeStr: string;   // HH:MM:SS,mmm
+  startTimeStr: string; // HH:MM:SS,mmm ou "Pág. 1" / "Capítulo 1"
+  endTimeStr: string;   // HH:MM:SS,mmm ou "Frase 1"
   text: string;
   rawText: string;
+  pageNumber?: number;
+  chapterTitle?: string;
 }
 
 export interface SubtitleFile {
   id: string;
   title: string;
   description?: string;
-  category?: 'movies' | 'speeches' | 'dialogues' | 'custom';
+  category?: 'movies' | 'speeches' | 'dialogues' | 'custom' | 'book' | 'pdf' | 'epub';
+  contentType?: ContentType;
+  author?: string;
+  totalPages?: number;
+  totalChapters?: number;
   cues: SubtitleCue[];
   durationMs: number;
   createdAt: number;
@@ -74,3 +82,31 @@ export interface StudyStats {
   subtitlesCompleted: number;
   totalStudySeconds: number;
 }
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  name?: string;
+  createdAt: string;
+  avatarUrl?: string;
+}
+
+export interface UserProgressStats {
+  totalWordsSaved: number;
+  masteredWordsCount: number;
+  learningWordsCount: number;
+  masteryPercentage: number;
+  totalReviews: number;
+  studyStreakDays: number;
+  subtitlesCompleted: number;
+}
+
+export interface StudySessionLog {
+  id: string;
+  userId: string;
+  cardsReviewed: number;
+  cardsMastered: number;
+  durationSeconds: number;
+  createdAt: string;
+}
+

@@ -39,6 +39,8 @@ export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({
     navigation.navigate('Player');
   };
 
+  const isBook = currentSubtitle?.contentType === 'epub' || currentSubtitle?.contentType === 'pdf' || currentSubtitle?.category === 'epub' || currentSubtitle?.category === 'pdf' || currentSubtitle?.category === 'book';
+
   const renderCueItem = ({ item, index }: { item: SubtitleCue; index: number }) => (
     <TouchableOpacity
       style={styles.cueItemCard}
@@ -50,10 +52,20 @@ export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({
           <Text style={styles.indexText}>#{item.id}</Text>
         </View>
 
-        <View style={styles.timeBadge}>
-          <Ionicons name="time-outline" size={12} color="#94A3B8" />
-          <Text style={styles.timeText}>
-            {item.startTimeStr.split(',')[0]} → {item.endTimeStr.split(',')[0]}
+        <View style={[
+          styles.timeBadge,
+          item.chapterTitle ? { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: '#10B981', borderWidth: 1 } : null
+        ]}>
+          <Ionicons
+            name={item.chapterTitle ? 'book-outline' : item.pageNumber ? 'document-text-outline' : 'time-outline'}
+            size={12}
+            color={item.chapterTitle ? '#34D399' : item.pageNumber ? '#F87171' : '#94A3B8'}
+          />
+          <Text style={[
+            styles.timeText,
+            item.chapterTitle ? { color: '#34D399' } : item.pageNumber ? { color: '#F87171' } : null
+          ]}>
+            {item.chapterTitle || (item.pageNumber ? `Página ${item.pageNumber}` : `${item.startTimeStr.split(',')[0]} → ${item.endTimeStr.split(',')[0]}`)}
           </Text>
         </View>
 
@@ -74,9 +86,9 @@ export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.screenTitle}>Transcrição Completa</Text>
+          <Text style={styles.screenTitle}>{isBook ? 'Leitura Contínua' : 'Transcrição Completa'}</Text>
           <Text style={styles.subtitleCount}>
-            {currentSubtitle ? `${cues.length} falas indexadas` : 'Nenhuma legenda'}
+            {currentSubtitle ? `${cues.length} ${isBook ? 'frases indexadas' : 'falas indexadas'} • ${currentSubtitle.title}` : 'Nenhum conteúdo'}
           </Text>
         </View>
 
@@ -105,7 +117,7 @@ export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({
             keyExtractor={(item) => `cue_${item.id}`}
             renderItem={renderCueItem}
             contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
           />
         ) : (
           <View style={styles.emptyContainer}>
