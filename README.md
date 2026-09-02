@@ -1,4 +1,4 @@
-# ReadSub 🎬 — Leitor Interativo de Legendas (.SRT) para Aprendizado de Inglês
+# ReadSub 🎬 — Leitor Interativo de Legendas (.SRT) e e-books (.PDF/.epub)  para Aprendizado de Inglês
 
 > **Projeto Final da Disciplina de Laboratório de Desenvolvimento de Aplicações Móveis (Lab 3)**  
 > **IFBA — Instituto Federal de Educação, Ciência e Tecnologia da Bahia**  
