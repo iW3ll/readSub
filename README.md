@@ -82,23 +82,26 @@ O projeto foi conduzido utilizando metodologia ágil baseada no **Kanban**, com 
 - [Expo Go](https://expo.dev/go) instalado no smartphone Android ou iOS (ou emulador Android Studio / iOS Simulator).
 
 ### Passo a Passo:
-1. Abra o terminal na pasta do projeto:
+1. Atualize o node no site:
+   https://nodejs.org/en/download
+
+3. Abra o terminal na pasta do projeto:
    ```bash
    cd readSub
    ```
 
-2. Instale as dependências:
+4. Instale as dependências:
    ```bash
    npm install
    ```
 
-3. Inicie o servidor de desenvolvimento do Expo:
+5. Inicie o servidor de desenvolvimento do Expo:
    ```bash
    npx expo start
    ```
 
-4. **Para testar no celular:** Escaneie o QR Code exibido no terminal utilizando o aplicativo **Expo Go** (no Android) ou a Câmera (no iOS).
-5. **Para testar no navegador web (opcional):** Pressione a tecla `w` no terminal.
+6. **Para testar no celular:** Escaneie o QR Code exibido no terminal utilizando o aplicativo **Expo Go** (no Android) ou a Câmera (no iOS).
+7. **Para testar no navegador web (opcional):** Pressione a tecla `w` no terminal.
 
 ---
 
