@@ -227,14 +227,11 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Informações Acadêmicas do Projeto */}
-        <View style={styles.aboutCard}>
-          <Text style={styles.aboutTitle}>ReadSub — Projeto Final Lab 3</Text>
-          <Text style={styles.aboutText}>
-            IFBA — Instituto Federal da Bahia • Semestre 2026.1{'\n'}
-            Desenvolvido com React Native, Expo, DeepL API, Free Dictionary API & AsyncStorage.
-          </Text>
-          <Text style={styles.versionText}>Versão 1.0.0 (Entrega Final)</Text>
+        <View style={styles.footerNote}>
+          <Text style={styles.footerNoteText}>ReadSub Feito por </Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://github.com/iW3ll')}>
+            <Text style={[styles.footerNoteText, styles.linkText]}>Wesley</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={{ height: 40 }} />
